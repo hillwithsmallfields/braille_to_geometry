@@ -92,6 +92,23 @@ class BrailleDotter:
         bottom = rows * self.cell_y_size
         return shapely.Polygon([[0, 0], [right, 0], [right, bottom], [0, bottom]])
 
+    def text_dimensions(self, text, dot_size=None):
+        """Return the width and height of a brailled string."""
+        column = 0
+        max_column = 0
+        rows = 1
+        for character in text:
+            if character == '\n':
+                rows += 1
+                if column > max_column:
+                    max_column = column
+                column = 0
+            else:
+                column += 1
+        if column > max_column:
+            max_column = column
+        return max_column * self.cell_x_size, rows * self.cell_y_size
+
 class BrailleDotterUKAAF(BrailleDotter):
 
     """Braille dotter using the dimensions from the UK Association for Accessible Formats.
