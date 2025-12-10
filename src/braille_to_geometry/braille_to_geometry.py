@@ -42,12 +42,14 @@ class BrailleDotter:
 
         Currently handles only letters, spaces and newlines."""
         result = []
-        x = 0
-        y = 0
+        # move the dot centres in to allow for the size of the dot
+        margin = self.dot_size
+        x = margin
+        y = margin
         for character in text:
             match character:
                 case '\n':
-                    x = 0
+                    x = margin
                     y += self.cell_y_size
                 case ' ':
                     x += self.cell_x_size
@@ -66,6 +68,29 @@ class BrailleDotter:
                                 dots >>= 1
                         x += self.cell_x_size
         return shapely.GeometryCollection(result)
+
+    def text_to_bbox(self, text, dot_size=None):
+        """Return the bounding box of a string, as a shapely.Polygon.
+
+        This can be used to find whether a braille label can be placed
+        in a given position without interfering with other geometry.
+        """
+        column = 0
+        max_column = 0
+        rows = 1
+        for character in text:
+            if character == '\n':
+                rows += 1
+                if column > max_column:
+                    max_column = column
+                column = 0
+            else:
+                column += 1
+        if column > max_column:
+            max_column = column
+        right = max_column * self.cell_x_size
+        bottom = rows * self.cell_y_size
+        return shapely.Polygon([[0, 0], [right, 0], [right, bottom], [0, bottom]])
 
 class BrailleDotterUKAAF(BrailleDotter):
 
@@ -102,6 +127,9 @@ class BrailleDotterBANA(BrailleDotter):
         )
 
 with open("/tmp/dots.svg", 'w') as outstream:
+    text = "Braille in\ntwo lines"
+    dotter = BrailleDotterUKAAF()
     outstream.write('<svg width="600" height="600">\n')
-    outstream.write(BrailleDotterUKAAF().text_to_dots("Braille in\ntwo lines").svg())
+    outstream.write(dotter.text_to_bbox(text).svg())
+    outstream.write(dotter.text_to_dots(text).svg())
     outstream.write('</svg>')
