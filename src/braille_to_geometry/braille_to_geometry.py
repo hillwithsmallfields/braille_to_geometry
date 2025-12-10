@@ -29,38 +29,79 @@ DOTS = {
     "Z": 0b110101,
 }
 
-# Dimensions from https://www.ukaaf.org/wp-content/uploads/2020/03/Braille-Standard-Dimensions.pdf, in mm
-DOT_SIZE = 1.5
-DOT_SPACING = 2.5
-CELL_X_SIZE = 6.0
-CELL_Y_SIZE = 10.0
+class BrailleDotter:
 
-def text_to_dots(text):
-    result = []
-    x = 0
-    y = 0
-    for character in text:
-        match character:
-            case '\n':
-                x = 0
-                y += CELL_Y_SIZE
-            case ' ':
-                x += CELL_X_SIZE
-            case _:
-                if character.isalpha():
-                    dots = DOTS.get(character.upper())
-                    if dots:
-                        for i in range(6):
-                            if dots & 1:
-                                result.append(shapely.buffer(shapely.Point(x+DOT_SPACING*(i//3),
-                                                                           y+DOT_SPACING*(i%3)),
-                                                             DOT_SIZE/8))
+    def __init__(self, dot_spacing, cell_x_size, cell_y_size, dot_size):
+        self.dot_size = dot_size
+        self.dot_spacing = dot_spacing
+        self.cell_x_size = cell_x_size
+        self.cell_y_size = cell_y_size
 
-                            dots >>= 1
-                    x += CELL_X_SIZE
-    return shapely.GeometryCollection(result)
+    def text_to_dots(self, text, dot_size=None):
+        """Convert a string to a shapely.GeometryCollection of Braille dots.
+
+        Currently handles only letters, spaces and newlines."""
+        result = []
+        x = 0
+        y = 0
+        for character in text:
+            match character:
+                case '\n':
+                    x = 0
+                    y += self.cell_y_size
+                case ' ':
+                    x += self.cell_x_size
+                case _:
+                    if character.isalpha():
+                        dots = DOTS.get(character.upper())
+                        if dots:
+                            for i in range(6):
+                                if dots & 1:
+                                    result.append(shapely.buffer(shapely.Point(x+self.dot_spacing*(i//3),
+                                                                               y+self.dot_spacing*(i%3)),
+                                                                 ((dot_size/2)
+                                                                  if dot_size
+                                                                  else (self.dot_size/8))))
+
+                                dots >>= 1
+                        x += self.cell_x_size
+        return shapely.GeometryCollection(result)
+
+class BrailleDotterUKAAF(BrailleDotter):
+
+    """Braille dotter using the dimensions from the UK Association for Accessible Formats.
+
+    This is the same as the Marburg Medium Braille font as mandated
+    for pharmaceutical braille in the EU.
+    """
+
+    def __init__(self):
+        super().__init__(
+            # Dimensions from
+            # https://www.ukaaf.org/wp-content/uploads/2020/03/Braille-Standard-Dimensions.pdf,
+            # in mm
+            dot_size=1.5,
+            dot_spacing=2.5,
+            cell_x_size=6.0,
+            cell_y_size=10.0,
+        )
+
+class BrailleDotterBANA(BrailleDotter):
+
+    """Braille dotter using the dimensions from the Braille Authority of North America."""
+
+    def __init__(self):
+        super().__init__(
+            # Dimensions from
+            # https://brailleauthority.org/size-and-spacing-braille-characters
+            # in mm
+            dot_size=1.44,
+            dot_spacing=2.34,
+            cell_x_size=6.2,
+            cell_y_size=10.0,
+        )
 
 with open("/tmp/dots.svg", 'w') as outstream:
     outstream.write('<svg width="600" height="600">\n')
-    outstream.write(text_to_dots("Braille in\ntwo lines").svg())
+    outstream.write(BrailleDotterUKAAF().text_to_dots("Braille in\ntwo lines").svg())
     outstream.write('</svg>')
