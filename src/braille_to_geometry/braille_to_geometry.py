@@ -29,13 +29,32 @@ DOTS = {
     "Z": 0b110101,
 }
 
+MORE_DOTS = {
+    "Á": 0b000001,
+    "À": 0b000001,
+    "Ä": 0b000001,
+    "É": 0b010001,
+    "È": 0b010001,
+    "Ë": 0b010001,
+    "Í": 0b010101,
+    "Ì": 0b010101,
+    "Ï": 0b010101,
+    "Ó": 0b001010,
+    "Ò": 0b001010,
+    "Ö": 0b001010,
+    "Ú": 0b100101,
+    "Ù": 0b100101,
+    "Ü": 0b100101,
+}
+
 class BrailleDotter:
 
-    def __init__(self, dot_spacing, cell_x_size, cell_y_size, dot_size):
+    def __init__(self, dot_spacing, cell_x_size, cell_y_size, dot_size, crush_diacritics=True):
         self.dot_size = dot_size
         self.dot_spacing = dot_spacing
         self.cell_x_size = cell_x_size
         self.cell_y_size = cell_y_size
+        self.dots = (DOTS | MORE_DOTS) if crush_diacritics else DOTS
 
     def text_to_dots(self, text, dot_size=None):
         """Convert a string to a shapely.GeometryCollection of Braille dots.
@@ -55,7 +74,7 @@ class BrailleDotter:
                     x += self.cell_x_size
                 case _:
                     if character.isalpha():
-                        dots = DOTS.get(character.upper())
+                        dots = self.dots.get(character.upper())
                         if dots:
                             for i in range(6):
                                 if dots & 1:
