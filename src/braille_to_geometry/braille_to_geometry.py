@@ -1,3 +1,4 @@
+import math
 import shapely
 
 DOTS = {
@@ -47,14 +48,74 @@ MORE_DOTS = {
     "Ü": 0b100101,
 }
 
+class DotShape:
+
+    """Parent class for things that return dot shapes.
+
+    They are made as classes with a common parent, so that we can test
+    unambiguously for one of them being passed in as the dot specification.
+    """
+
+    def __init__(self):
+        self._dot = None
+
+    def dot(self):
+        return self._dot
+
+class Square(DotShape):
+
+    def __init__(self, size):
+        self._dot =  shapely.Polygon([[0, 0],
+                                      [0, size],
+                                      [size, size],
+                                      [size, 0]])
+
+class Diamond(DotShape):
+
+    def __init__(self, size):
+        half = size/2
+        self._dot =  shapely.Polygon([[-half, 0],
+                                      [0, half],
+                                      [half, 0],
+                                      [0, -half]])
+
+class Octagon(DotShape):
+
+    def __init__(self, size):
+        half = size/2
+        octant = math.sqrt(half/2)
+        self._dot =  shapely.Polygon([[-half, 0],
+                                      [-octant, octant],
+                                      [0, half],
+                                      [octant, octant],
+                                      [half, 0],
+                                      [octant, -octant],
+                                      [0, -half],
+                                      [-octant, -octant]])
+
 class BrailleDotter:
 
-    def __init__(self, dot_spacing, cell_x_size, cell_y_size, dot_size, crush_diacritics=True):
+    def __init__(self, dot_spacing, cell_x_size, cell_y_size,
+                 dot_size=None,
+                 crush_diacritics=True,
+                 dot_shape=None,
+                 scale=1.0
+                 ):
         self.dot_size = dot_size
+        self.scale = scale
         self.dot_spacing = dot_spacing
         self.cell_x_size = cell_x_size
         self.cell_y_size = cell_y_size
         self.dots = (DOTS | MORE_DOTS) if crush_diacritics else DOTS
+        self.dot_shape = ((dot_shape(self.dot_size).dot()
+                           if isinstance(dot_shape, type) and issubclass(dot_shape, DotShape)
+                           else dot_shape)
+                          if dot_shape
+                          else shapely.buffer(shapely.Point(0, 0),
+                                              ((self.dot_size/2)
+                                                      if self.dot_size
+                                                      else (self.dot_size/8))))
+        print("dot shape", dot_shape, isinstance(dot_shape, type) and issubclass(dot_shape, DotShape), "makes dot", self.dot_shape)
 
     def text_to_dots(self, text, dot_size=None):
         """Convert a string to a shapely.GeometryCollection of Braille dots.
@@ -62,30 +123,29 @@ class BrailleDotter:
         Currently handles only letters, spaces and newlines."""
         result = []
         # move the dot centres in to allow for the size of the dot
-        margin = self.dot_size
+        margin = self.dot_size or cell_x_size / 4
         x = margin
         y = margin
         for character in text:
             match character:
                 case '\n':
                     x = margin
-                    y += self.cell_y_size
+                    y += self.cell_y_size * self.scale
                 case ' ':
-                    x += self.cell_x_size
+                    x += self.cell_x_size * self.scale
                 case _:
                     if character.isalpha():
                         dots = self.dots.get(character.upper())
                         if dots:
                             for i in range(6):
                                 if dots & 1:
-                                    result.append(shapely.buffer(shapely.Point(x+self.dot_spacing*(i//3),
-                                                                               y+self.dot_spacing*(i%3)),
-                                                                 ((dot_size/2)
-                                                                  if dot_size
-                                                                  else (self.dot_size/8))))
-
+                                    result.append(
+                                        shapely.affinity.translate(
+                                            self.dot_shape,
+                                            x + self.dot_spacing*(i//3)*self.scale,
+                                            y + self.dot_spacing*(i%3)*self.scale))
                                 dots >>= 1
-                        x += self.cell_x_size
+                        x += self.cell_x_size * self.scale
         return shapely.GeometryCollection(result)
 
     def text_to_bbox(self, text, dot_size=None):
@@ -107,8 +167,8 @@ class BrailleDotter:
                 column += 1
         if column > max_column:
             max_column = column
-        right = max_column * self.cell_x_size
-        bottom = rows * self.cell_y_size
+        right = max_column * self.cell_x_size * self.scale
+        bottom = rows * self.cell_y_size * self.scale
         return shapely.Polygon([[0, 0], [right, 0], [right, bottom], [0, bottom]])
 
     def text_dimensions(self, text, dot_size=None):
@@ -136,31 +196,35 @@ class BrailleDotterUKAAF(BrailleDotter):
     for pharmaceutical braille in the EU.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        print("making BrailleDotterUKAAF with kwargs", kwargs)
+
         super().__init__(
-            # Dimensions from
-            # https://www.ukaaf.org/wp-content/uploads/2020/03/Braille-Standard-Dimensions.pdf,
-            # in mm
-            dot_size=1.5,
-            dot_spacing=2.5,
-            cell_x_size=6.0,
-            cell_y_size=10.0,
-        )
+            **({
+                # Dimensions from
+                # https://www.ukaaf.org/wp-content/uploads/2020/03/Braille-Standard-Dimensions.pdf,
+                # in mm
+                'dot_size': 1.5,
+                'dot_spacing': 2.5,
+                'cell_x_size': 6.0,
+                'cell_y_size': 10.0,
+            } | kwargs))
 
 class BrailleDotterBANA(BrailleDotter):
 
     """Braille dotter using the dimensions from the Braille Authority of North America."""
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__(
-            # Dimensions from
-            # https://brailleauthority.org/size-and-spacing-braille-characters
-            # in mm
-            dot_size=1.44,
-            dot_spacing=2.34,
-            cell_x_size=6.2,
-            cell_y_size=10.0,
-        )
+            **({
+                # Dimensions from
+                # https://brailleauthority.org/size-and-spacing-braille-characters
+                # in mm
+                'dot_size': 1.44,
+                'dot_spacing': 2.34,
+                'cell_x_size': 6.2,
+                'cell_y_size': 10.0,
+            } | kwargs))
 
 with open("/tmp/dots.svg", 'w') as outstream:
     text = "Braille in\ntwo lines"
