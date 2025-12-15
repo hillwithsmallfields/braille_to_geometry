@@ -150,6 +150,17 @@ class BrailleDotter:
                                             y + self.dot_spacing*(i%3)*y_scale))
                                 dots >>= 1
                         x += self.cell_x_size * x_scale
+                    elif character & 0xff00 == 0x2800:
+                        for i in range(6):
+                            if dots & 1:
+                                result.append(
+                                    shapely.affinity.translate(
+                                        self.dot_shape,
+                                        x + self.dot_spacing*(i//3)*x_scale,
+                                        y + self.dot_spacing*(i%3)*y_scale))
+                            dots >>= 1
+                    x += self.cell_x_size * x_scale
+
         return shapely.GeometryCollection(result)
 
     def text_to_bbox(self, text, dot_size=None):
