@@ -99,10 +99,12 @@ class BrailleDotter:
                  dot_size=None,
                  crush_diacritics=True,
                  dot_shape=None,
-                 scale=1.0
+                 scale=1.0,
+                 y_scale_adjust=1.0
                  ):
         self.dot_size = dot_size
         self.scale = scale
+        self.y_scale_adjust = y_scale_adjust
         self.dot_spacing = dot_spacing
         self.cell_x_size = cell_x_size
         self.cell_y_size = cell_y_size
@@ -126,13 +128,15 @@ class BrailleDotter:
         margin = self.dot_size or cell_x_size / 4
         x = margin
         y = margin
+        x_scale = self.scale
+        y_scale = self.scale * self.y_scale_adjust
         for character in text:
             match character:
                 case '\n':
                     x = margin
-                    y += self.cell_y_size * self.scale
+                    y += self.cell_y_size * y_scale
                 case ' ':
-                    x += self.cell_x_size * self.scale
+                    x += self.cell_x_size * x_scale
                 case _:
                     if character.isalpha():
                         dots = self.dots.get(character.upper())
@@ -142,10 +146,10 @@ class BrailleDotter:
                                     result.append(
                                         shapely.affinity.translate(
                                             self.dot_shape,
-                                            x + self.dot_spacing*(i//3)*self.scale,
-                                            y + self.dot_spacing*(i%3)*self.scale))
+                                            x + self.dot_spacing*(i//3)*x_scale,
+                                            y + self.dot_spacing*(i%3)*y_scale))
                                 dots >>= 1
-                        x += self.cell_x_size * self.scale
+                        x += self.cell_x_size * x_scale
         return shapely.GeometryCollection(result)
 
     def text_to_bbox(self, text, dot_size=None):
