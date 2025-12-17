@@ -150,7 +150,7 @@ class BrailleDotter:
                                             y + self.dot_spacing*(i%3)*y_scale))
                                 dots >>= 1
                         x += self.cell_x_size * x_scale
-                    elif character & 0xff00 == 0x2800:
+                    elif ord(character) & 0xff00 == 0x2800:
                         for i in range(6):
                             if dots & 1:
                                 result.append(
