@@ -117,7 +117,6 @@ class BrailleDotter:
                                               ((self.dot_size/2)
                                                       if self.dot_size
                                                       else (self.dot_size/8))))
-        print("dot shape", dot_shape, isinstance(dot_shape, type) and issubclass(dot_shape, DotShape), "makes dot", self.dot_shape)
 
     def text_to_dots(self, text, dot_size=None):
         """Convert a string to a shapely.GeometryCollection of Braille dots.
@@ -125,7 +124,8 @@ class BrailleDotter:
         Currently handles only letters, spaces and newlines."""
         result = []
         # move the dot centres in to allow for the size of the dot
-        margin = self.dot_size or cell_x_size / 4
+        margin = self.dot_size or self.cell_x_size / 4
+        margin = self.cell_x_size / 4
         x = margin
         y = margin
         x_scale = self.scale
@@ -149,7 +149,6 @@ class BrailleDotter:
                                             x + self.dot_spacing*(i//3)*x_scale,
                                             y + self.dot_spacing*(i%3)*y_scale))
                                 dots >>= 1
-                        x += self.cell_x_size * x_scale
                     elif ord(character) & 0xff00 == 0x2800:
                         for i in range(6):
                             if dots & 1:
@@ -182,9 +181,16 @@ class BrailleDotter:
                 column += 1
         if column > max_column:
             max_column = column
-        right = max_column * self.cell_x_size * self.scale
-        bottom = rows * self.cell_y_size * self.scale
+        # move the dot centres in to allow for the size of the dot
+        margin = self.dot_size or cell_x_size / 4
+        right = max_column * self.cell_x_size * self.scale + margin*2
+        bottom = rows * self.cell_y_size * self.scale + margin*2
         return shapely.Polygon([[0, 0], [right, 0], [right, bottom], [0, bottom]])
+
+    def text_in_box(self, text, dot_size=None):
+        """Convert a string to a shapely.GeometryCollection of Braille dots, against an incised background."""
+        return shapely.difference(self.text_to_bbox(text, dot_size=dot_size),
+                                  self.text_to_dots(text, dot_size=dot_size))
 
     def text_dimensions(self, text, dot_size=None):
         """Return the width and height of a brailled string."""
@@ -219,7 +225,8 @@ class BrailleDotterUKAAF(BrailleDotter):
                 # Dimensions from
                 # https://www.ukaaf.org/wp-content/uploads/2020/03/Braille-Standard-Dimensions.pdf,
                 # in mm
-                'dot_size': 1.5,
+                # 'dot_size': 1.5,
+                'dot_size': 1,
                 'dot_spacing': 2.5,
                 'cell_x_size': 6.0,
                 'cell_y_size': 10.0,
@@ -242,9 +249,10 @@ class BrailleDotterBANA(BrailleDotter):
             } | kwargs))
 
 with open("/tmp/dots.svg", 'w') as outstream:
-    text = "Braille in\ntwo lines"
+    text = "Braille in several\nlines or rows of\nbraille cells for\ntesting purposes"
     dotter = BrailleDotterUKAAF()
     outstream.write('<svg width="600" height="600">\n')
-    outstream.write(dotter.text_to_bbox(text).svg())
-    outstream.write(dotter.text_to_dots(text).svg())
+    # outstream.write(dotter.text_to_bbox(text).svg())
+    # outstream.write(dotter.text_to_dots(text).svg())
+    outstream.write(dotter.text_in_box(text).svg())
     outstream.write('</svg>')
