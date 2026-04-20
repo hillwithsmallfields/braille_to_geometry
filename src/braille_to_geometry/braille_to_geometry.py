@@ -48,6 +48,26 @@ MORE_DOTS = {
     "Ü": 0b100101,
 }
 
+class GeometricOutput:
+
+    """Parent class for geometric output systems."""
+
+    def __init__(self):
+        self.translate = None
+        self.combine = None
+        self.difference = None
+
+class GeometricOutput_2d(GeometricOutput):
+
+    def __init__(self):
+        self.translate = shapely.affinity.translate
+        self.combine = shapely.GeometryCollection
+        self.difference = shapely.difference
+
+class GeometricOutput_3d(GeometricOutput):
+
+    pass
+
 class DotShape:
 
     """Parent class for things that return dot shapes.
@@ -57,50 +77,61 @@ class DotShape:
     """
 
     def __init__(self):
-        self._dot = None
+        self._dot_2d = None
+        self._dot_3d = None
 
-    def dot(self):
-        return self._dot
+    def dot_2d(self):
+        return self._dot_2d
+
+    def dot_3d(self):
+        return self._dot_3d
 
 class Square(DotShape):
 
     def __init__(self, size):
-        self._dot =  shapely.Polygon([[0, 0],
-                                      [0, size],
-                                      [size, size],
-                                      [size, 0]])
+        self._dot_2d =  shapely.Polygon([[0, 0],
+                                         [0, size],
+                                         [size, size],
+                                         [size, 0]])
 
 class Diamond(DotShape):
 
     def __init__(self, size):
         half = size/2
-        self._dot =  shapely.Polygon([[-half, 0],
-                                      [0, half],
-                                      [half, 0],
-                                      [0, -half]])
+        self._dot_2d =  shapely.Polygon([[-half, 0],
+                                         [0, half],
+                                         [half, 0],
+                                         [0, -half]])
 
 class Octagon(DotShape):
 
     def __init__(self, size):
         half = size/2
         octant = math.sqrt(half/2)
-        self._dot =  shapely.Polygon([[-half, 0],
-                                      [-octant, octant],
-                                      [0, half],
-                                      [octant, octant],
-                                      [half, 0],
-                                      [octant, -octant],
-                                      [0, -half],
-                                      [-octant, -octant]])
+        self._dot_2d =  shapely.Polygon([[-half, 0],
+                                         [-octant, octant],
+                                         [0, half],
+                                         [octant, octant],
+                                         [half, 0],
+                                         [octant, -octant],
+                                         [0, -half],
+                                         [-octant, -octant]])
+
+class Circle(DotShape):
+
+    def __init__(self, size):
+        self._dot_3d = "sphere(%d);" % size
 
 class BrailleDotter:
 
     def __init__(self, dot_spacing, cell_x_size, cell_y_size,
                  dot_size=None,
                  crush_diacritics=True,
-                 dot_shape=None,
+                 dot_shape_2d=None,
+                 dot_shape_3d=None,
                  scale=1.0,
                  y_scale_adjust=1.0
+                 geometric_output=GeometricOutput_2d,
                  ):
         self.dot_size = dot_size
         self.scale = scale
@@ -109,14 +140,20 @@ class BrailleDotter:
         self.cell_x_size = cell_x_size
         self.cell_y_size = cell_y_size
         self.dots = (DOTS | MORE_DOTS) if crush_diacritics else DOTS
-        self.dot_shape = ((dot_shape(self.dot_size).dot()
-                           if isinstance(dot_shape, type) and issubclass(dot_shape, DotShape)
-                           else dot_shape)
-                          if dot_shape
-                          else shapely.buffer(shapely.Point(0, 0),
-                                              ((self.dot_size/2)
-                                                      if self.dot_size
-                                                      else (self.dot_size/8))))
+        self.dot_shape_2d = ((dot_shape_2d(self.dot_size).dot_2d()
+                              if isinstance(dot_shape_2d, type) and issubclass(dot_shape_2d, DotShape)
+                              else dot_shape_2d)
+                             if dot_shape_2d
+                             else shapely.buffer(shapely.Point(0, 0),
+                                                 ((self.dot_size/2)
+                                                  if self.dot_size
+                                                  else (self.dot_size/8))))
+        self.dot_shape_3d = ((dot_shape_3d(self.dot_size).dot_3d()
+                              if isinstance(dot_shape_3d, type) and issubclass(dot_shape_3d, DotShape)
+                              else dot_shape_3d)
+                             if dot_shape_3d
+                             else "sphere(1);")
+        self.geometric_output = geometric_output
 
     def text_to_dots(self, text, dot_size=None):
         """Convert a string to a shapely.GeometryCollection of Braille dots.
@@ -144,8 +181,8 @@ class BrailleDotter:
                             for i in range(6):
                                 if dots & 1:
                                     result.append(
-                                        shapely.affinity.translate(
-                                            self.dot_shape,
+                                        self.geometric_output.translate(
+                                            self.dot_shape_2d,
                                             x + self.dot_spacing*(i//3)*x_scale,
                                             y + self.dot_spacing*(i%3)*y_scale))
                                 dots >>= 1
@@ -153,14 +190,14 @@ class BrailleDotter:
                         for i in range(6):
                             if dots & 1:
                                 result.append(
-                                    shapely.affinity.translate(
-                                        self.dot_shape,
+                                    self.geometric_output.translate(
+                                        self.dot_shape_2d,
                                         x + self.dot_spacing*(i//3)*x_scale,
                                         y + self.dot_spacing*(i%3)*y_scale))
                             dots >>= 1
                     x += self.cell_x_size * x_scale
 
-        return shapely.GeometryCollection(result)
+        return self.geometric_output.combine(result)
 
     def text_to_bbox(self, text, dot_size=None):
         """Return the bounding box of a string, as a shapely.Polygon.
@@ -188,9 +225,9 @@ class BrailleDotter:
         return shapely.Polygon([[0, 0], [right, 0], [right, bottom], [0, bottom]])
 
     def text_in_box(self, text, dot_size=None):
-        """Convert a string to a shapely.GeometryCollection of Braille dots, against an incised background."""
-        return shapely.difference(self.text_to_bbox(text, dot_size=dot_size),
-                                  self.text_to_dots(text, dot_size=dot_size))
+        """Convert a string to a collection of Braille dots, against an incised background."""
+        return self.geometric_output.difference(self.text_to_bbox(text, dot_size=dot_size),
+                                                self.text_to_dots(text, dot_size=dot_size))
 
     def text_dimensions(self, text, dot_size=None):
         """Return the width and height of a brailled string."""
