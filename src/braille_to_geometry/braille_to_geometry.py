@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import math
 import shapely
 
@@ -130,7 +132,7 @@ class BrailleDotter:
                  dot_shape_2d=None,
                  dot_shape_3d=None,
                  scale=1.0,
-                 y_scale_adjust=1.0
+                 y_scale_adjust=1.0,
                  geometric_output=GeometricOutput_2d,
                  ):
         self.dot_size = dot_size
@@ -153,7 +155,7 @@ class BrailleDotter:
                               else dot_shape_3d)
                              if dot_shape_3d
                              else "sphere(1);")
-        self.geometric_output = geometric_output
+        self.geometric_output = geometric_output()
 
     def text_to_dots(self, text, dot_size=None):
         """Convert a string to a shapely.GeometryCollection of Braille dots.
