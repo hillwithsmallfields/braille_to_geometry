@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# useful info: https://www.pharmabraille.com/pharmaceutical-braille/marburg-medium-font-standard/
+
+import argparse
 import math
 import shapely
 
@@ -49,6 +52,12 @@ MORE_DOTS = {
     "Ù": 0b100101,
     "Ü": 0b100101,
 }
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", "-o")
+    parser.add_argument("--dimensions", "-d")
+    return vars(parser.parse_args())
 
 class GeometricOutput:
 
@@ -287,11 +296,15 @@ class BrailleDotterBANA(BrailleDotter):
                 'cell_y_size': 10.0,
             } | kwargs))
 
-with open("/tmp/dots.svg", 'w') as outstream:
-    text = "Braille in several\nlines or rows of\nbraille cells for\ntesting purposes"
-    dotter = BrailleDotterUKAAF()
-    outstream.write('<svg width="600" height="600">\n')
-    # outstream.write(dotter.text_to_bbox(text).svg())
-    # outstream.write(dotter.text_to_dots(text).svg())
-    outstream.write(dotter.text_in_box(text).svg())
-    outstream.write('</svg>')
+def braille_main(output, dimensions):
+    with open("/tmp/dots.svg", 'w') as outstream:
+        text = "Braille in several\nlines or rows of\nbraille cells for\ntesting purposes"
+        dotter = BrailleDotterUKAAF()
+        outstream.write('<svg width="600" height="600">\n')
+        # outstream.write(dotter.text_to_bbox(text).svg())
+        # outstream.write(dotter.text_to_dots(text).svg())
+        outstream.write(dotter.text_in_box(text).svg())
+        outstream.write('</svg>')
+
+if __name__ == "__main__":
+    main(**get_args())
