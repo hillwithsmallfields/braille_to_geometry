@@ -63,21 +63,38 @@ class GeometricOutput:
 
     """Parent class for geometric output systems."""
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.translate = None
         self.combine = None
         self.difference = None
+        self._dot = None
+
+    def dot(self):
+        return self._dot
 
 class GeometricOutput_2d(GeometricOutput):
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.translate = shapely.affinity.translate
         self.combine = shapely.GeometryCollection
         self.difference = shapely.difference
+        self._dot = ((dot_shape_2d(self.dot_size).dot_2d()
+                      if isinstance(dot_shape_2d, type) and issubclass(dot_shape_2d, DotShape)
+                      else dot_shape_2d)
+                     if dot_shape_2d
+                     else shapely.buffer(shapely.Point(0, 0),
+                                         ((self.dot_size/2)
+                                          if self.dot_size
+                                          else (self.dot_size/8))))
 
 class GeometricOutput_3d(GeometricOutput):
 
-    pass
+    def __init__(self, **kwargs):
+        self._dot = ((dot_shape_3d(self.dot_size).dot_3d()
+                      if isinstance(dot_shape_3d, type) and issubclass(dot_shape_3d, DotShape)
+                      else dot_shape_3d)
+                     if dot_shape_3d
+                     else "sphere(1);")
 
 class DotShape:
 
@@ -151,6 +168,7 @@ class BrailleDotter:
         self.cell_x_size = cell_x_size
         self.cell_y_size = cell_y_size
         self.dots = (DOTS | MORE_DOTS) if crush_diacritics else DOTS
+        # TODO: move this to GeometricOutput_2d
         self.dot_shape_2d = ((dot_shape_2d(self.dot_size).dot_2d()
                               if isinstance(dot_shape_2d, type) and issubclass(dot_shape_2d, DotShape)
                               else dot_shape_2d)
@@ -159,6 +177,7 @@ class BrailleDotter:
                                                  ((self.dot_size/2)
                                                   if self.dot_size
                                                   else (self.dot_size/8))))
+        # TODO: move this to GeometricOutput_3d
         self.dot_shape_3d = ((dot_shape_3d(self.dot_size).dot_3d()
                               if isinstance(dot_shape_3d, type) and issubclass(dot_shape_3d, DotShape)
                               else dot_shape_3d)
@@ -211,6 +230,7 @@ class BrailleDotter:
         return self.geometric_output.combine(result)
 
     def text_to_bbox(self, text, dot_size=None):
+        # TODO: sort out what type to return here
         """Return the bounding box of a string, as a shapely.Polygon.
 
         This can be used to find whether a braille label can be placed
